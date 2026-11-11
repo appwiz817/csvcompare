@@ -1,0 +1,20 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+.mnotes
+.env
+# folders
+/0csv_data_generator
+/0old
+/csv_audit/datafiles/sample_college_data/reports
+/reports
+
+# Virtual environments
+.venv
+
+# Other files
+.DS_Store
