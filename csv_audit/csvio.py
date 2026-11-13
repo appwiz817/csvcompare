@@ -1,4 +1,4 @@
-"""CSV input reading without rewriting or normalizing field contents."""
+"""CSV input reading without changing input files or field values."""
 from __future__ import annotations
 
 import csv
@@ -7,7 +7,7 @@ from pathlib import Path
 
 
 class InputError(ValueError):
-    """Raised when an input CSV cannot be read or has an invalid shape."""
+    """Raised when an input CSV cannot be read or has an invalid header."""
 
 
 @dataclass
@@ -19,26 +19,31 @@ class CsvData:
 
 
 def read_csv(path: Path, delimiter: str) -> CsvData:
-    """Read records as strings and record rows with the wrong field count."""
+    """Read a CSV as strings; retain malformed rows for reporting."""
     try:
         with path.open("r", encoding="utf-8-sig", newline="") as stream:
             reader = csv.reader(stream, delimiter=delimiter)
             try:
                 headers = next(reader)
-            except StopIteration:
-                raise InputError(f"{path}: file is empty; a header row is required.")
-            if not headers or any(name == "" for name in headers):
+            except StopIteration as exc:
+                raise InputError(f"{path}: file is empty; a header row is required.") from exc
+
+            if not headers or any(header == "" for header in headers):
                 raise InputError(f"{path}: headers must be nonempty.")
             if len(set(headers)) != len(headers):
                 raise InputError(f"{path}: duplicate header names are ambiguous.")
-            rows, malformed = [], []
-            for line_number, fields in enumerate(reader, start=2):
-                if len(fields) != len(headers):
-                    malformed.append((line_number, fields))
+
+            rows: list[dict[str, str]] = []
+            malformed: list[tuple[int, list[str]]] = []
+            for line_number, values in enumerate(reader, start=2):
+                if len(values) != len(headers):
+                    malformed.append((line_number, values))
                     continue
-                rows.append(dict(zip(headers, fields)))
+                rows.append(dict(zip(headers, values)))
+
     except OSError as exc:
         raise InputError(f"Cannot read {path}: {exc}") from exc
     except csv.Error as exc:
         raise InputError(f"Invalid CSV in {path}: {exc}") from exc
+
     return CsvData(path, headers, rows, malformed)

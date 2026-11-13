@@ -4,4 +4,6 @@ version = "0.1.0"
 description = "Utility to compare two CSV files and generate a report of differences."
 readme = "README.md"
 requires-python = ">=3.12"
-dependencies = []
+dependencies = [
+    "faker>=40.54.0",
+]
