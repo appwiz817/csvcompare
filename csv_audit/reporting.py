@@ -105,7 +105,11 @@ def write_reports(
     with (report_dir / "differences.csv").open(
         "w", encoding="utf-8", newline=""
     ) as file:
-        writer = csv.DictWriter(file, fieldnames=fieldnames)
+        writer = csv.DictWriter(
+            file,
+            fieldnames=fieldnames,
+            delimiter=source.delimiter,
+        )
         writer.writeheader()
         for item in result.differences:
             writer.writerow(_report_row(item, key_columns, record_headers))
@@ -123,7 +127,11 @@ def write_reports(
     with (report_dir / "examples.csv").open(
         "w", encoding="utf-8", newline=""
     ) as file:
-        writer = csv.DictWriter(file, fieldnames=fieldnames)
+        writer = csv.DictWriter(
+            file,
+            fieldnames=fieldnames,
+            delimiter=source.delimiter,
+        )
         writer.writeheader()
         for example in examples:
             signature = (example.get("category", ""), example.get("column", ""))
