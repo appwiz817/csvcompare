@@ -61,8 +61,22 @@ def main() -> int:
         if args.keyed and not config.key:
             raise ConfigError("Keyed mode requires KEY in .env.")
 
-        source = read_csv(config.file1, config.delimiter)
-        target = read_csv(config.file2, config.delimiter)
+        source = read_csv(config.file1)
+        target = read_csv(config.file2, source.delimiter)
+
+        # Keep the report's delimiter value consistent with what was detected.
+        config = config.__class__(
+            data_dir=config.data_dir,
+            file1=config.file1,
+            file2=config.file2,
+            reports=config.reports,
+            key=config.key,
+            delimiter=source.delimiter,
+        )
+
+        
+        # source = read_csv(config.file1, config.delimiter)
+        # target = read_csv(config.file2, config.delimiter)
 
         result = compare(
             source,

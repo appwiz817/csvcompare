@@ -16,22 +16,44 @@ class CsvData:
     headers: list[str]
     rows: list[dict[str, str]]
     malformed_rows: list[tuple[int, list[str]]]
+    delimiter: str
 
 
-def read_csv(path: Path, delimiter: str) -> CsvData:
-    """Read a CSV as strings; retain malformed rows for reporting."""
+def read_csv(path: Path, delimiter: str | None = None) -> CsvData:
+    """Read a CSV as strings; detect the delimiter from the first row if omitted."""
     try:
         with path.open("r", encoding="utf-8-sig", newline="") as stream:
+            if delimiter is None:
+                first_row = stream.readline()
+                if not first_row:
+                    raise InputError(
+                        f"{path}: file is empty; a header row is required."
+                    )
+
+                try:
+                    dialect = csv.Sniffer().sniff(first_row, delimiters=",\t;|")
+                except csv.Error as exc:
+                    raise InputError(
+                        f"{path}: could not detect delimiter from the first row."
+                    ) from exc
+
+                delimiter = dialect.delimiter
+                stream.seek(0)
+
             reader = csv.reader(stream, delimiter=delimiter)
             try:
                 headers = next(reader)
             except StopIteration as exc:
-                raise InputError(f"{path}: file is empty; a header row is required.") from exc
+                raise InputError(
+                    f"{path}: file is empty; a header row is required."
+                ) from exc
 
             if not headers or any(header == "" for header in headers):
                 raise InputError(f"{path}: headers must be nonempty.")
             if len(set(headers)) != len(headers):
-                raise InputError(f"{path}: duplicate header names are ambiguous.")
+                raise InputError(
+                    f"{path}: duplicate header names are ambiguous."
+                )
 
             rows: list[dict[str, str]] = []
             malformed: list[tuple[int, list[str]]] = []
@@ -46,4 +68,4 @@ def read_csv(path: Path, delimiter: str) -> CsvData:
     except csv.Error as exc:
         raise InputError(f"Invalid CSV in {path}: {exc}") from exc
 
-    return CsvData(path, headers, rows, malformed)
+    return CsvData(path, headers, rows, malformed, delimiter)
