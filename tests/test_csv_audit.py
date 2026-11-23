@@ -2,6 +2,7 @@ import csv
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import Mock, patch
 
 from csv_audit.compare import compare
 from csv_audit.config import Config, resolve_path
@@ -139,6 +140,29 @@ class CsvAuditTests(unittest.TestCase):
         self.assertEqual(rows[0]["key__id"], "1")
         self.assertEqual(rows[0]["record__value"], "a")
         self.assertEqual(rows[0]["issue_column_value"], "a")
+
+    def test_report_folder_uses_short_local_timestamp_and_collision_suffix(self):
+        left = self.make_csv("left.csv", "id,value\n1,a\n")
+        right = self.make_csv("right.csv", "id,value\n1,b\n")
+        config = Config(
+            data_dir=self.root,
+            file1=left.path,
+            file2=right.path,
+            reports=self.root / "reports",
+            key=("id",),
+            delimiter=",",
+        )
+        result = compare(left, right, True, ("id",))
+        fixed_now = Mock()
+        fixed_now.astimezone.return_value.strftime.return_value = "20261122-230712"
+
+        with patch("csv_audit.reporting.datetime") as mocked_datetime:
+            mocked_datetime.now.return_value = fixed_now
+            first = write_reports(config, left, right, result, True, None)
+            second = write_reports(config, left, right, result, True, None)
+
+        self.assertRegex(first.name, r"^\d{8}-\d{6}$")
+        self.assertEqual(second.name, f"{first.name}-2")
 
     def test_examples_report_has_one_paired_example_per_category(self):
         left = self.make_csv("left.csv", "id,name,amount\n1,Alice,3.40\n")

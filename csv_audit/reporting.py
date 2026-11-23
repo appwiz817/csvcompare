@@ -2,9 +2,8 @@
 from __future__ import annotations
 
 import csv
-from datetime import datetime, timezone
+from datetime import datetime
 from pathlib import Path
-from uuid import uuid4
 
 from .compare import Comparison
 from .config import Config
@@ -47,9 +46,16 @@ def write_reports(
 ) -> Path:
     """Write exactly three CSV reports and return their directory."""
     config.reports.mkdir(parents=True, exist_ok=True)
-    timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S.%fZ")
-    report_dir = config.reports / f"{timestamp}-{uuid4().hex[:8]}"
-    report_dir.mkdir()
+    timestamp = datetime.now().astimezone().strftime("%Y%m%d-%H%M%S")
+    report_dir = config.reports / timestamp
+    suffix = 2
+    while True:
+        try:
+            report_dir.mkdir()
+            break
+        except FileExistsError:
+            report_dir = config.reports / f"{timestamp}-{suffix}"
+            suffix += 1
 
     source_header_set = set(source.headers)
     target_header_set = set(target.headers)
