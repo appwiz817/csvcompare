@@ -50,6 +50,20 @@ def _decimal_places(value: str) -> int | None:
         return None
 
 
+def _decimals_equal(left: str, right: str) -> bool:
+    """Return whether both values are finite decimals with equal numeric value."""
+    try:
+        left_number = Decimal(left)
+        right_number = Decimal(right)
+        return (
+            left_number.is_finite()
+            and right_number.is_finite()
+            and left_number == right_number
+        )
+    except InvalidOperation:
+        return False
+
+
 def _entry(
     source_name: str,
     category: str,
@@ -257,10 +271,10 @@ def compare(
             places_a = _decimal_places(a)
             places_b = _decimal_places(b)
             if places_a is not None and places_b is not None and places_a != places_b:
-                categories["decimal_places_difference"] += 1
+                categories["decimal_diff"] += 1
                 differences.extend([
-                    _entry("file1", "decimal_places_difference", key_columns, key, column, left),
-                    _entry("file2", "decimal_places_difference", key_columns, key, column, right),
+                    _entry("file1", "decimal_diff", key_columns, key, column, left),
+                    _entry("file2", "decimal_diff", key_columns, key, column, right),
                 ])
 
         for _, source_column, target_column in comparable_columns:
@@ -282,6 +296,27 @@ def compare(
             if value_a == value_b:
                 continue
 
+            places_a = _decimal_places(a)
+            places_b = _decimal_places(b)
+            if (
+                places_a is not None
+                and places_b is not None
+                and places_a != places_b
+                and _decimals_equal(a, b)
+            ):
+                categories["decimal_diff"] += 1
+                differences.extend([
+                    _entry(
+                        "file1", "decimal_diff",
+                        key_columns, key, source_column, left
+                    ),
+                    _entry(
+                        "file2", "decimal_diff",
+                        key_columns, key, target_column, right
+                    ),
+                ])
+                continue
+
             # Keep the per-file column names in the difference entries.
             display_column = (
                 source_column
@@ -294,17 +329,15 @@ def compare(
                 _entry("file2", "different_value", key_columns, key, target_column, right),
             ])
 
-            places_a = _decimal_places(a)
-            places_b = _decimal_places(b)
             if places_a is not None and places_b is not None and places_a != places_b:
-                categories["decimal_places_difference"] += 1
+                categories["decimal_diff"] += 1
                 differences.extend([
                     _entry(
-                        "file1", "decimal_places_difference",
+                        "file1", "decimal_diff",
                         key_columns, key, source_column, left
                     ),
                     _entry(
-                        "file2", "decimal_places_difference",
+                        "file2", "decimal_diff",
                         key_columns, key, target_column, right
                     ),
                 ])
@@ -323,4 +356,3 @@ def compare(
         len(units),
         header_details,
     )
-

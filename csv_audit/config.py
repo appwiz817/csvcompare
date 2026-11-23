@@ -5,8 +5,6 @@ import os
 from dataclasses import dataclass
 from pathlib import Path
 
-from dotenv import load_dotenv
-
 
 class ConfigError(ValueError):
     """Raised when configuration is missing or invalid."""
@@ -32,6 +30,8 @@ def resolve_path(value: str, base: Path) -> Path:
 
 def load_config(env_file: str | Path = ".env") -> Config:
     """Load settings from dotenv and the process environment."""
+    from dotenv import load_dotenv
+
     load_dotenv(env_file)
 
     data_dir_value = os.getenv("DATA_DIR")

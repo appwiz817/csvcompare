@@ -114,14 +114,14 @@ def write_reports(
         for item in result.differences:
             writer.writerow(_report_row(item, key_columns, record_headers))
 
-    # One example per category and issue column. Matched examples retain both
+    # Keep one representative issue per category. Matched examples retain both
     # sides, because each side has its own differences.csv row.
     examples: list[dict] = []
-    seen: set[tuple[str, str]] = set()
+    seen: set[str] = set()
     for item in result.differences:
-        signature = (item.get("category", ""), item.get("column", ""))
-        if signature not in seen:
-            seen.add(signature)
+        category = item.get("category", "")
+        if category not in seen:
+            seen.add(category)
             examples.append(item)
 
     with (report_dir / "examples.csv").open(
@@ -134,15 +134,13 @@ def write_reports(
         )
         writer.writeheader()
         for example in examples:
-            signature = (example.get("category", ""), example.get("column", ""))
             writer.writerow(_report_row(example, key_columns, record_headers))
 
             # Include the other side of the same matched example, if present.
             for candidate in result.differences:
                 if (
                     candidate is example
-                    or candidate.get("category") != signature[0]
-                    or candidate.get("column") != signature[1]
+                    or candidate.get("category") != example.get("category")
                     or candidate.get("key") != example.get("key")
                     or candidate.get("data_source") == example.get("data_source")
                 ):

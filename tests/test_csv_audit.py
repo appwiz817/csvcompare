@@ -27,7 +27,20 @@ class CsvAuditTests(unittest.TestCase):
         right = self.make_csv("right.csv", "id,value\n1,5.00\n")
         result = compare(left, right, True, ("id",))
         self.assertEqual(result.categories["different_value"], 1)
-        self.assertEqual(result.categories["decimal_places_difference"], 1)
+        self.assertEqual(result.categories["decimal_diff"], 1)
+
+    def test_equal_decimal_with_different_precision_is_only_decimal_difference(self):
+        left = self.make_csv("left.csv", "id,value\n1,3.40\n")
+        right = self.make_csv("right.csv", "id,value\n1,3.4000\n")
+
+        result = compare(left, right, True, ("id",))
+
+        self.assertNotIn("different_value", result.categories)
+        self.assertEqual(result.categories["decimal_diff"], 1)
+        self.assertEqual(
+            [item["category"] for item in result.differences],
+            ["decimal_diff", "decimal_diff"],
+        )
 
     # def test_default_ignores_case_whitespace_and_blank_null_pairs(self):
     #     left = self.make_csv("left.csv", "id,name,empty\n1, Alice ,\n")
@@ -126,6 +139,71 @@ class CsvAuditTests(unittest.TestCase):
         self.assertEqual(rows[0]["key__id"], "1")
         self.assertEqual(rows[0]["record__value"], "a")
         self.assertEqual(rows[0]["issue_column_value"], "a")
+
+    def test_examples_report_has_one_paired_example_per_category(self):
+        left = self.make_csv("left.csv", "id,name,amount\n1,Alice,3.40\n")
+        right = self.make_csv("right.csv", "id,name,amount\n1,Bob,3.4000\n")
+        config = Config(
+            data_dir=self.root,
+            file1=left.path,
+            file2=right.path,
+            reports=self.root / "reports",
+            key=("id",),
+            delimiter=",",
+        )
+        result = compare(left, right, True, ("id",))
+
+        report_dir = write_reports(config, left, right, result, True, None)
+
+        with (report_dir / "examples.csv").open(newline="", encoding="utf-8") as file:
+            examples = list(csv.DictReader(file))
+        by_category = {}
+        for row in examples:
+            by_category.setdefault(row["category"], []).append(row)
+
+        self.assertEqual(
+            set(by_category),
+            {"different_value", "decimal_diff"},
+        )
+        self.assertEqual(len(by_category["different_value"]), 2)
+        self.assertEqual(len(by_category["decimal_diff"]), 2)
+        for rows in by_category.values():
+            self.assertEqual(
+                {row["data_source"] for row in rows},
+                {"file1", "file2"},
+            )
+
+    def test_examples_pair_decimal_precision_rows_when_headers_differ(self):
+        left = self.make_csv("left.csv", "id,amount\n1,3.40\n")
+        right = self.make_csv("right.csv", "id,total\n1,3.4000\n")
+        config = Config(
+            data_dir=self.root,
+            file1=left.path,
+            file2=right.path,
+            reports=self.root / "reports",
+            key=("id",),
+            delimiter=",",
+        )
+        result = compare(left, right, True, ("id",))
+
+        report_dir = write_reports(config, left, right, result, True, None)
+
+        with (report_dir / "examples.csv").open(newline="", encoding="utf-8") as file:
+            examples = list(csv.DictReader(file))
+        decimal_examples = [
+            row for row in examples
+            if row["category"] == "decimal_diff"
+        ]
+
+        self.assertEqual(len(decimal_examples), 2)
+        self.assertEqual(
+            {row["data_source"] for row in decimal_examples},
+            {"file1", "file2"},
+        )
+        self.assertEqual(
+            {row["issue_column"] for row in decimal_examples},
+            {"amount", "total"},
+        )
 
 
 if __name__ == "__main__":
