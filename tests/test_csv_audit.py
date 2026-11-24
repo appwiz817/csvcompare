@@ -147,11 +147,13 @@ class CsvAuditTests(unittest.TestCase):
         result = compare(left, right, True, ("id",))
         report_dir = write_reports(config, left, right, result, True, None)
 
-        self.assertTrue((report_dir / "summary.csv").exists())
-        self.assertTrue((report_dir / "differences.csv").exists())
-        self.assertTrue((report_dir / "examples.csv").exists())
+        self.assertTrue((report_dir / f"summary-{report_dir.name}.csv").exists())
+        self.assertTrue((report_dir / f"differences-{report_dir.name}.csv").exists())
+        self.assertTrue((report_dir / f"examples-{report_dir.name}.csv").exists())
 
-        with (report_dir / "summary.csv").open(newline="", encoding="utf-8") as f:
+        with (report_dir / f"summary-{report_dir.name}.csv").open(
+            newline="", encoding="utf-8"
+        ) as f:
             summary = list(csv.reader(f))
         self.assertIn(
             ["headers_only_in_file1", "['old']"],
@@ -162,7 +164,9 @@ class CsvAuditTests(unittest.TestCase):
             summary,
         )
 
-        with (report_dir / "differences.csv").open(newline="", encoding="utf-8") as f:
+        with (report_dir / f"differences-{report_dir.name}.csv").open(
+            newline="", encoding="utf-8"
+        ) as f:
             rows = list(csv.DictReader(f))
         self.assertEqual(
             list(rows[0]),
@@ -196,7 +200,7 @@ class CsvAuditTests(unittest.TestCase):
 
         report_dir = write_reports(config, left, right, result, True, None)
 
-        with (report_dir / "differences.csv").open(
+        with (report_dir / f"differences-{report_dir.name}.csv").open(
             newline="", encoding="utf-8"
         ) as file:
             rows = list(csv.DictReader(file))
@@ -235,6 +239,11 @@ class CsvAuditTests(unittest.TestCase):
 
         self.assertRegex(first.name, r"^\d{8}-\d{6}$")
         self.assertEqual(second.name, f"{first.name}-2")
+        for directory in (first, second):
+            for report in ("summary", "differences", "examples"):
+                self.assertTrue(
+                    (directory / f"{report}-{directory.name}.csv").exists()
+                )
 
     def test_examples_report_has_one_paired_example_per_category(self):
         left = self.make_csv("left.csv", "id,name,amount\n1,Alice,3.40\n")
@@ -251,7 +260,9 @@ class CsvAuditTests(unittest.TestCase):
 
         report_dir = write_reports(config, left, right, result, True, None)
 
-        with (report_dir / "examples.csv").open(newline="", encoding="utf-8") as file:
+        with (report_dir / f"examples-{report_dir.name}.csv").open(
+            newline="", encoding="utf-8"
+        ) as file:
             examples = list(csv.DictReader(file))
         by_category = {}
         for row in examples:
@@ -284,7 +295,9 @@ class CsvAuditTests(unittest.TestCase):
 
         report_dir = write_reports(config, left, right, result, True, None)
 
-        with (report_dir / "examples.csv").open(newline="", encoding="utf-8") as file:
+        with (report_dir / f"examples-{report_dir.name}.csv").open(
+            newline="", encoding="utf-8"
+        ) as file:
             examples = list(csv.DictReader(file))
         decimal_examples = [
             row for row in examples

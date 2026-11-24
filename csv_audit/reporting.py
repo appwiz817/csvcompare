@@ -87,6 +87,10 @@ def write_reports(
         except FileExistsError:
             report_dir = config.reports / f"{timestamp}-{suffix}"
             suffix += 1
+    report_timestamp = report_dir.name
+    summary_path = report_dir / f"summary-{report_timestamp}.csv"
+    differences_path = report_dir / f"differences-{report_timestamp}.csv"
+    examples_path = report_dir / f"examples-{report_timestamp}.csv"
 
     source_header_set = set(source.headers)
     target_header_set = set(target.headers)
@@ -124,7 +128,7 @@ def write_reports(
         for name, count in sorted(result.categories.items())
     )
 
-    with (report_dir / "summary.csv").open("w", encoding="utf-8", newline="") as file:
+    with summary_path.open("w", encoding="utf-8", newline="") as file:
         writer = csv.writer(file)
         writer.writerow(["item", "value"])
         writer.writerows(summary_rows)
@@ -134,9 +138,7 @@ def write_reports(
     fieldnames, record_columns = _report_columns(key_columns, record_headers)
 
     # Complete differences: one row per side of a matched difference.
-    with (report_dir / "differences.csv").open(
-        "w", encoding="utf-8", newline=""
-    ) as file:
+    with differences_path.open("w", encoding="utf-8", newline="") as file:
         writer = csv.DictWriter(
             file,
             fieldnames=fieldnames,
@@ -158,9 +160,7 @@ def write_reports(
             seen.add(category)
             examples.append(item)
 
-    with (report_dir / "examples.csv").open(
-        "w", encoding="utf-8", newline=""
-    ) as file:
+    with examples_path.open("w", encoding="utf-8", newline="") as file:
         writer = csv.DictWriter(
             file,
             fieldnames=fieldnames,
