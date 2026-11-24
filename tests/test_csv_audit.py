@@ -43,6 +43,16 @@ class CsvAuditTests(unittest.TestCase):
             ["decimal_diff", "decimal_diff"],
         )
 
+    def test_equal_numeric_values_with_same_precision_are_not_differences(self):
+        left = self.make_csv("left.csv", "id,value\n1,+03.40\n")
+        right = self.make_csv("right.csv", "id,value\n1,3.40\n")
+
+        result = compare(left, right, True, ("id",))
+
+        self.assertNotIn("different_value", result.categories)
+        self.assertNotIn("decimal_diff", result.categories)
+        self.assertEqual(result.differences, [])
+
     # def test_default_ignores_case_whitespace_and_blank_null_pairs(self):
     #     left = self.make_csv("left.csv", "id,name,empty\n1, Alice ,\n")
     #     right = self.make_csv("right.csv", "id,name,empty\n1,alice,NULL\n")
@@ -137,9 +147,54 @@ class CsvAuditTests(unittest.TestCase):
 
         with (report_dir / "differences.csv").open(newline="", encoding="utf-8") as f:
             rows = list(csv.DictReader(f))
-        self.assertEqual(rows[0]["key__id"], "1")
-        self.assertEqual(rows[0]["record__value"], "a")
-        self.assertEqual(rows[0]["issue_column_value"], "a")
+        self.assertEqual(
+            list(rows[0]),
+            [
+                "data_source", "category", "k_id", "diff_column", "diff_value",
+                "id", "value", "old", "new",
+            ],
+        )
+        self.assertEqual(rows[0]["k_id"], "1")
+        self.assertEqual(rows[0]["diff_column"], "value")
+        self.assertEqual(rows[0]["diff_value"], "a")
+        self.assertEqual(rows[0]["value"], "a")
+        self.assertEqual(rows[0]["old"], "x")
+
+    def test_source_category_header_does_not_overwrite_difference_category(self):
+        left = self.make_csv(
+            "left.csv", "id,category,value\n1,source-one,old\n"
+        )
+        right = self.make_csv(
+            "right.csv", "id,category,value\n1,source-two,new\n"
+        )
+        config = Config(
+            data_dir=self.root,
+            file1=left.path,
+            file2=right.path,
+            reports=self.root / "reports",
+            key=("id",),
+            delimiter=",",
+        )
+        result = compare(left, right, True, ("id",))
+
+        report_dir = write_reports(config, left, right, result, True, None)
+
+        with (report_dir / "differences.csv").open(
+            newline="", encoding="utf-8"
+        ) as file:
+            rows = list(csv.DictReader(file))
+        value_differences = [
+            row for row in rows if row["diff_column"] == "value"
+        ]
+
+        self.assertEqual(
+            {row["category"] for row in value_differences},
+            {"different_value"},
+        )
+        self.assertEqual(
+            {row["source_category"] for row in value_differences},
+            {"source-one", "source-two"},
+        )
 
     def test_report_folder_uses_short_local_timestamp_and_collision_suffix(self):
         left = self.make_csv("left.csv", "id,value\n1,a\n")
@@ -225,7 +280,7 @@ class CsvAuditTests(unittest.TestCase):
             {"file1", "file2"},
         )
         self.assertEqual(
-            {row["issue_column"] for row in decimal_examples},
+            {row["diff_column"] for row in decimal_examples},
             {"amount", "total"},
         )
 

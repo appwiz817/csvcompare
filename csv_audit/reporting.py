@@ -10,25 +10,56 @@ from .config import Config
 from .csvio import CsvData
 
 
+def _report_columns(
+    key_columns: list[str],
+    record_headers: list[str],
+) -> tuple[list[str], dict[str, str]]:
+    """Build unique report headers and map original input headers to them."""
+    metadata = (
+        ["data_source", "category"]
+        + [f"k_{name}" for name in key_columns]
+        + ["diff_column", "diff_value"]
+    )
+    used = set(metadata)
+    record_columns: dict[str, str] = {}
+
+    for name in record_headers:
+        if name not in used:
+            record_columns[name] = name
+            used.add(name)
+
+    for name in record_headers:
+        if name in record_columns:
+            continue
+        output_name = f"source_{name}"
+        while output_name in used:
+            output_name = f"source_{output_name}"
+        record_columns[name] = output_name
+        used.add(output_name)
+
+    return metadata + [record_columns[name] for name in record_headers], record_columns
+
+
 def _report_row(
     item: dict,
     key_columns: list[str],
     record_headers: list[str],
+    record_columns: dict[str, str],
 ) -> dict[str, str]:
     """Convert one comparison entry into a flat CSV row."""
     record = item.get("record") or {}
-    issue_column = item.get("column") or ""
+    diff_column = item.get("column") or ""
 
     row = {
         "data_source": item.get("data_source", ""),
         "category": item.get("category", ""),
-        "issue_column": issue_column,
-        "issue_column_value": record.get(issue_column, "") if issue_column else "",
+        "diff_column": diff_column,
+        "diff_value": record.get(diff_column, "") if diff_column else "",
     }
     for name in key_columns:
-        row[f"key__{name}"] = (item.get("key") or {}).get(name, "")
+        row[f"k_{name}"] = (item.get("key") or {}).get(name, "")
     for name in record_headers:
-        row[f"record__{name}"] = record.get(name, "")
+        row[record_columns[name]] = record.get(name, "")
     return row
 
 
@@ -100,12 +131,7 @@ def write_reports(
 
     key_columns = list(config.key) if keyed else []
     record_headers = list(dict.fromkeys(source.headers + target.headers))
-    fieldnames = (
-        ["data_source", "category"]
-        + [f"key__{name}" for name in key_columns]
-        + ["issue_column", "issue_column_value"]
-        + [f"record__{name}" for name in record_headers]
-    )
+    fieldnames, record_columns = _report_columns(key_columns, record_headers)
 
     # Complete differences: one row per side of a matched difference.
     with (report_dir / "differences.csv").open(
@@ -118,7 +144,9 @@ def write_reports(
         )
         writer.writeheader()
         for item in result.differences:
-            writer.writerow(_report_row(item, key_columns, record_headers))
+            writer.writerow(
+                _report_row(item, key_columns, record_headers, record_columns)
+            )
 
     # Keep one representative issue per category. Matched examples retain both
     # sides, because each side has its own differences.csv row.
@@ -140,7 +168,9 @@ def write_reports(
         )
         writer.writeheader()
         for example in examples:
-            writer.writerow(_report_row(example, key_columns, record_headers))
+            writer.writerow(
+                _report_row(example, key_columns, record_headers, record_columns)
+            )
 
             # Include the other side of the same matched example, if present.
             for candidate in result.differences:
@@ -151,7 +181,9 @@ def write_reports(
                     or candidate.get("data_source") == example.get("data_source")
                 ):
                     continue
-                writer.writerow(_report_row(candidate, key_columns, record_headers))
+                writer.writerow(
+                    _report_row(candidate, key_columns, record_headers, record_columns)
+                )
                 break
 
     return report_dir

@@ -209,9 +209,6 @@ def compare(
     if limit is not None:
         units = units[:limit]
 
-    columns = list(dict.fromkeys(source.headers + target.headers))
-
-
     for key, left, right in units:
         if left is None:
             categories["missing_from_source"] += 1
@@ -225,57 +222,6 @@ def compare(
         # No-key mode only matches identical rows, so it has no cell differences.
         if not keyed:
             continue
-
-        # for column in columns:
-            a = left.get(column)
-            b = right.get(column)
-            if a is None or b is None:
-                continue
-
-            # if ignore_blank_nulls and _is_blank_or_null(a) and _is_blank_or_null(b):
-            #     continue
-
-            # Ignore only when both values are blank after trimming.
-            # Ignore this field if either side is blank after trimming.
-            # Literal values such as "NULL" and "N/A" are not blank.
-            if ignore_blank_nulls and (
-                _is_blank_after_trim(a) or _is_blank_after_trim(b)
-            ):
-                continue
-
-
-
-            value_a = _comparison_value(a, case_sensitive, trim_whitespace)
-            value_b = _comparison_value(b, case_sensitive, trim_whitespace)
-
-            if value_a == value_b:
-                continue
-
-            categories["different_value"] += 1
-            differences.extend([
-                _entry("file1", "different_value", key_columns, key, column, left),
-                _entry("file2", "different_value", key_columns, key, column, right),
-            ])
-
-            # Formatting is an additional category only when values differ
-            # literally but compare equal after trim/case normalization.
-            format_a = _comparison_value(a, False, True)
-            format_b = _comparison_value(b, False, True)
-            if format_a == format_b and a != b:
-                categories["formatting_difference"] += 1
-                differences.extend([
-                    _entry("file1", "formatting_difference", key_columns, key, column, left),
-                    _entry("file2", "formatting_difference", key_columns, key, column, right),
-                ])
-
-            places_a = _decimal_places(a)
-            places_b = _decimal_places(b)
-            if places_a is not None and places_b is not None and places_a != places_b:
-                categories["decimal_diff"] += 1
-                differences.extend([
-                    _entry("file1", "decimal_diff", key_columns, key, column, left),
-                    _entry("file2", "decimal_diff", key_columns, key, column, right),
-                ])
 
         for _, source_column, target_column in comparable_columns:
             a = left.get(source_column)
@@ -298,31 +244,26 @@ def compare(
 
             places_a = _decimal_places(a)
             places_b = _decimal_places(b)
-            if (
-                places_a is not None
-                and places_b is not None
-                and places_a != places_b
-                and _decimals_equal(a, b)
-            ):
-                categories["decimal_diff"] += 1
-                differences.extend([
-                    _entry(
-                        "file1", "decimal_diff",
-                        key_columns, key, source_column, left
-                    ),
-                    _entry(
-                        "file2", "decimal_diff",
-                        key_columns, key, target_column, right
-                    ),
-                ])
+            if _decimals_equal(a, b):
+                if (
+                    places_a is not None
+                    and places_b is not None
+                    and places_a != places_b
+                ):
+                    categories["decimal_diff"] += 1
+                    differences.extend([
+                        _entry(
+                            "file1", "decimal_diff",
+                            key_columns, key, source_column, left
+                        ),
+                        _entry(
+                            "file2", "decimal_diff",
+                            key_columns, key, target_column, right
+                        ),
+                    ])
+                continue
                 continue
 
-            # Keep the per-file column names in the difference entries.
-            display_column = (
-                source_column
-                if source_column == target_column
-                else f"{source_column} <-> {target_column}"
-            )
             categories["different_value"] += 1
             differences.extend([
                 _entry("file1", "different_value", key_columns, key, source_column, left),
