@@ -23,12 +23,29 @@ class CsvAuditTests(unittest.TestCase):
         path.write_text(text, encoding="utf-8")
         return read_csv(path, delimiter)
 
-    def test_keyed_difference_and_decimal_places(self):
+    def test_different_numeric_values_are_not_decimal_differences(self):
         left = self.make_csv("left.csv", "id,value\n1,3.0\n")
         right = self.make_csv("right.csv", "id,value\n1,5.00\n")
         result = compare(left, right, True, ("id",))
         self.assertEqual(result.categories["different_value"], 1)
-        self.assertEqual(result.categories["decimal_diff"], 1)
+        self.assertNotIn("decimal_diff", result.categories)
+        self.assertEqual(
+            [item["category"] for item in result.differences],
+            ["different_value", "different_value"],
+        )
+
+    def test_3934_99_and_3935_0_are_only_value_differences(self):
+        left = self.make_csv("left.csv", "id,value\n1,3934.99\n")
+        right = self.make_csv("right.csv", "id,value\n1,3935.0\n")
+
+        result = compare(left, right, True, ("id",))
+
+        self.assertEqual(result.categories["different_value"], 1)
+        self.assertNotIn("decimal_diff", result.categories)
+        self.assertEqual(
+            [item["category"] for item in result.differences],
+            ["different_value", "different_value"],
+        )
 
     def test_equal_decimal_with_different_precision_is_only_decimal_difference(self):
         left = self.make_csv("left.csv", "id,value\n1,3.40\n")

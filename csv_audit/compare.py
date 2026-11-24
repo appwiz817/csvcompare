@@ -262,26 +262,12 @@ def compare(
                         ),
                     ])
                 continue
-                continue
 
             categories["different_value"] += 1
             differences.extend([
                 _entry("file1", "different_value", key_columns, key, source_column, left),
                 _entry("file2", "different_value", key_columns, key, target_column, right),
             ])
-
-            if places_a is not None and places_b is not None and places_a != places_b:
-                categories["decimal_diff"] += 1
-                differences.extend([
-                    _entry(
-                        "file1", "decimal_diff",
-                        key_columns, key, source_column, left
-                    ),
-                    _entry(
-                        "file2", "decimal_diff",
-                        key_columns, key, target_column, right
-                    ),
-                ])
 
 
     if len(source.rows) != len(target.rows):
